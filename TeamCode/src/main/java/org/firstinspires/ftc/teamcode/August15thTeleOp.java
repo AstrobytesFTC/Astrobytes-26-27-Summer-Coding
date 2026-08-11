@@ -1,38 +1,53 @@
 package org.firstinspires.ftc.teamcode;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
-import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.hardware.rev.RevHubOrientationOnRobot;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
-@TeleOp
+@TeleOp(name = "Combined TeleOp")
 public class August15thTeleOp extends LinearOpMode {
+
+    // Adjust these after testing
+    private static final double LIFT = 0.40;
+    private static final double LOWER = -0.25;
+
+    private static final double NORMAL_POS = 0.50;
+    private static final double DUMP_POS = 0.25;
+
     @Override
     public void runOpMode() throws InterruptedException {
         // Declare our motors
         // Make sure your ID's match your configuration
-        DcMotor frontLeftMotor = hardwareMap.dcMotor.get("frontLeftMotor");
-        DcMotor backLeftMotor = hardwareMap.dcMotor.get("backLeftMotor");
-        DcMotor frontRightMotor = hardwareMap.dcMotor.get("frontRightMotor");
-        DcMotor backRightMotor = hardwareMap.dcMotor.get("backRightMotor");
+        DcMotor frontLeftMotor = hardwareMap.dcMotor.get("frontleft");
+        DcMotor backLeftMotor = hardwareMap.dcMotor.get("backleft");
+        DcMotor frontRightMotor = hardwareMap.dcMotor.get("frontright");
+        DcMotor backRightMotor = hardwareMap.dcMotor.get("backright");
         DcMotor intake = hardwareMap.dcMotor.get("intake");
+
+        // Lift + bucket hardware — update these names to match your configuration
+        DcMotor liftMotor = hardwareMap.get(DcMotor.class, "lyft");
+        Servo bucketServo = hardwareMap.get(Servo.class, "buck");
 
         // Reverse the right side motors. This may be wrong for your setup.
         // If your robot moves backwards when commanded to go forwards,
         // reverse the left side instead.
-        // See the note about this earlier on this page.
         frontRightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
         backRightMotor.setDirection(DcMotorSimple.Direction.REVERSE);
-        intake.setDirection(DcMotorSimple.Direction.REVERSE);
+
+        liftMotor.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.BRAKE);
+        liftMotor.setMode(DcMotor.RunMode.RUN_WITHOUT_ENCODER);
+        bucketServo.setPosition(NORMAL_POS);
 
         // Retrieve the IMU from the hardware map
         IMU imu = hardwareMap.get(IMU.class, "imu");
         // Adjust the orientation parameters to match your robot
         IMU.Parameters parameters = new IMU.Parameters(new RevHubOrientationOnRobot(
-                RevHubOrientationOnRobot.LogoFacingDirection.UP,
+                RevHubOrientationOnRobot.LogoFacingDirection.RIGHT,
                 RevHubOrientationOnRobot.UsbFacingDirection.FORWARD));
         // Without this, the REV Hub's orientation is assumed to be logo up / USB forward
         imu.initialize(parameters);
@@ -42,9 +57,12 @@ public class August15thTeleOp extends LinearOpMode {
         if (isStopRequested()) return;
 
         while (opModeIsActive()) {
+            // ----- Drivetrain (gamepad1) -----
             double y = -gamepad1.left_stick_y; // Remember, Y stick value is reversed
             double x = gamepad1.left_stick_x;
             double rx = gamepad1.right_stick_x;
+            double intakePower = -gamepad1.left_trigger;
+            double intakePowerR = gamepad1.right_trigger;
 
             // This button choice was made so that it is hard to hit on accident,
             // it can be freely changed based on preference.
@@ -75,14 +93,36 @@ public class August15thTeleOp extends LinearOpMode {
             frontRightMotor.setPower(frontRightPower);
             backRightMotor.setPower(backRightPower);
 
-            // Intake control via triggers
-            if (gamepad1.right_trigger > 0.1) {
-                intake.setPower(1);
-            } else if (gamepad1.left_trigger > 0.1) {
-                intake.setPower(-1);
+            // Intake — combine both triggers into one signed power instead of
+            // calling setPower twice (the second call was overwriting the first)
+            intake.setPower(intakePower);
+            intake.setPower(intakePowerR);
+
+            // ----- Lift + bucket (gamepad2) -----
+            // Raises/lowers the linear actuator
+            if (gamepad2.right_trigger > 0.1) {
+                liftMotor.setPower(LIFT);
             } else {
-                intake.setPower(0);
+                liftMotor.setPower(LOWER);
             }
+
+            // Tilts the bucket servo
+            if (gamepad2.b) {
+                bucketServo.setPosition(DUMP_POS);
+            } else {
+                bucketServo.setPosition(NORMAL_POS);
+            }
+
+            // ----- Telemetry -----
+            telemetry.addData("frontLeftPower", frontLeftPower);
+            telemetry.addData("frontRightPower", frontRightPower);
+            telemetry.addData("backLeftPower", backLeftPower);
+            telemetry.addData("backRightPower", backRightPower);
+            telemetry.addData("intakePower", intakePower + intakePowerR);
+            telemetry.addData("Right Trigger (lift)", gamepad2.right_trigger);
+            telemetry.addData("Lift Power", liftMotor.getPower());
+            telemetry.addData("Bucket Servo", bucketServo.getPosition());
+            telemetry.update();
         }
     }
 }
