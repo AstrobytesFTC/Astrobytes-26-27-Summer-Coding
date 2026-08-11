@@ -95,8 +95,8 @@ public class August15thTeleOp extends LinearOpMode {
 
             // Intake — combine both triggers into one signed power instead of
             // calling setPower twice (the second call was overwriting the first)
-            intake.setPower(intakePower);
-            intake.setPower(intakePowerR);
+            intake.setPower(intakePower*0.2);
+            intake.setPower(intakePowerR*0.2);
 
             // ----- Lift + bucket (gamepad2) -----
             // Raises/lowers the linear actuator
